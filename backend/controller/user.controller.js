@@ -9,10 +9,9 @@
 //   }
 // };
 
-
-
 import User from "../models/user.model.js";
-import  generateResponse from "../config/openRouter.js";
+import generateResponse from "../config/openRouter.js";
+import extraxtJson from "../utils/extraxtJson.js";
 export const getCurrentUser = async (req, res) => {
   try {
     // req.user is already set by isAuth middleware (password excluded)
@@ -22,11 +21,4 @@ export const getCurrentUser = async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 };
-export const generatedemo = async (req, res) => {
-  try {
-    const result = await generateResponse("Hello");
-    return res.status(200).json(result);
-  } catch (error) {
-    return res.status(500).json(error);
-  }
-};
+

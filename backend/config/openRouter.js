@@ -1,4 +1,4 @@
-const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions ";
+const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
 const model = "deepseek/deepseek-chat";
 const generateResponse = async (prompt) => {
   const res = await fetch(openRouterUrl, {
@@ -17,7 +17,7 @@ const generateResponse = async (prompt) => {
           content: prompt,
         },
       ],
-      temprature: 0.2,
+      temperature: 0.2,
     }),
   });
 

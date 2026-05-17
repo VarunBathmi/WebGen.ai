@@ -1,3 +1,8 @@
+import generateResponse from "../config/openRouter.js";
+import User from "../models/user.model.js";
+import Website from "../models/website.model.js";
+import extraxtJson from "../utils/extraxtJson.js";
+
 const masterPrompt = `
 YOU ARE A PRINCIPAL FRONTEND ARCHITECT
 AND A SENIOR UI/UX ENGINEER
@@ -152,9 +157,167 @@ export const generateWebsite = async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ message: "prompt is required" });
     }
-    const user = req.user;
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(400).json({ message: "user not found" });
     }
-  } catch (error) {}
+    if (user.credits < 50) {
+      return res
+        .status(400)
+        .json({ message: "you have not enough credits to generate a website" });
+    }
+    const finalPrompt = masterPrompt.replace("USER_PROMPT", prompt);
+    let raw = "";
+    let parsed = null;
+    for (let i = 0; i < 2 && !parsed; i++) {
+      raw = await generateResponse(finalPrompt);
+      parsed = await extraxtJson(raw);
+      if (!parsed) {
+        raw = await generateResponse(finalPrompt + "\n\nRETURN ONLY RAW JSON.");
+        parsed = await extraxtJson(raw);
+      }
+    }
+    if (!parsed.code) {
+      console.log("ai returned invalid response", raw);
+      return res.status(400).json({ message: "ai returned invalid response" });
+    }
+
+    // generate unique slug
+    const slug =
+      prompt
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w-]+/g, "") +
+      "-" +
+      Date.now();
+
+    const website = await Website.create({
+      user: user._id,
+      title: prompt.slice(0, 60),
+      slug, //edited
+      latestCode: parsed.code,
+      // conversation: [
+      //   {
+      //     role: "ai",
+      //     content: parsed.message,
+      //   },
+      //   {
+      //     role: "user",
+      //     content: prompt
+      //   },
+      // ],
+      // conversation: [
+      //   { role: "user", content: prompt },
+      //   { role: "ai", content: parsed.message }, // "ai" rakho
+      // ],
+      // ✅ Baad mein
+      conversation: [
+        { role: "user", content: prompt },
+        { role: "assistant", content: parsed.message },
+      ],
+    });
+    user.credits = user.credits - 50;
+    await user.save();
+    return res.status(201).json({
+      success: true, //edited
+      websiteId: website._id,
+      remainingCredits: user.credits,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ success: false, message: `generate website error ${error}` });
+  }
 };
+
+export const getWebsiteById = async (req, res) => {
+  try {
+    const website = await Website.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+    if (!website) {
+      return res.status(400).json({ message: "Website not found" });
+    }
+    return res.status(200).json(website);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: `generate get  website by Id error ${error}` });
+  }
+};
+export const chnages = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ message: "prompt is required" });
+    }
+    // const websiteId = req.params.id;
+    const website = await Website.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+    if (user.credits < 25) {
+      return res.status(400).json({
+        message: "you have not enough credits to generate a website ",
+      });
+    }
+    const updatePrompt = `UPDATE THIS HTML WEBSITE. 
+    CURRENT CODE: ${website.latestCode}
+    USER REQUEST:${prompt}
+    RETURN RAW JSON ONLY:
+    {
+    "message":"Short confirmation",
+    "code":"<UPDATED FULL HTML>"
+    } `;
+    let raw = "";
+    let parsed = null;
+    for (let i = 0; i < 2 && !parsed; i++) {
+      raw = await generateResponse(updatePrompt);
+      parsed = await extraxtJson(raw);
+      if (!parsed) {
+        raw = await generateResponse(
+          updatePrompt + "\n\nRETURN ONLY RAW JSON.",
+        );
+        parsed = await extraxtJson(raw);
+      }
+    }
+    if (!parsed.code) {
+      console.log("ai returned invalid response", raw);
+      return res.status(400).json({ message: "ai returned invalid response" });
+    }
+    website.conversation.push(
+      { role: "user", content: prompt },
+      { role: "assistant", content: parsed.message },
+    );
+    website.latestCode = parsed.code;
+    await website.save();
+    user.credits = user.credits - 25;
+    await user.save();
+    return res.status(200).json({
+      message: parsed.message,
+      code: parsed.code,
+      remainingCredits: user.credits,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: `update website error ${error}` });
+  }
+};
+export const getAll = async (req, res) => {
+  try {
+    const websites = await Website.find({ user: req.user._id });
+    return res.status(200).json(websites);
+  } catch (error) {
+    return res.status(500).json({ message: `get all websites error ${error}` });
+  }
+};
+// export const addCredits = async (req, res) => {
+//   const user = await User.findById(req.user._id);
+//   user.credits = 500;
+//   await user.save();
+//   return res.json({ message: "credits added", credits: user.credits });
+// };
