@@ -25,7 +25,7 @@ import useGetCurrentUser from "./hooks/useGetCurrentuser";
 import { useSelector } from "react-redux";
 import Dashboard from "./pages/Dashboard";
 import Generate from "./pages/Generate";
-import Editor from "./pages/Editor";
+import WebsiteEditor from "./pages/WebsiteEditor";
 
 export const serverUrl = "http://localhost:8000"; // ✅ fixed: was 8000
 
@@ -52,7 +52,7 @@ const App = () => {
           // ✅ Fix
           <Route
             path="/editor/:id"
-            element={userData ? <Editor /> : <Home />}
+            element={userData ? <WebsiteEditor /> : <Home />}
           />
         </Routes>
       </BrowserRouter>

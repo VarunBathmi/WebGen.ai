@@ -1,88 +1,29 @@
-// import axios from "axios";
-// import React, { useEffect, useState } from "react";
-// import { useParams } from "react-router-dom";
-// import { serverUrl } from "../App";
-
-// const Editor = () => {
-//   const { id } = useParams();
-//   const [website, setWebsite] = useState(null);
-//   const [error, setError] = useState("");
-
-//   useEffect(() => {
-//     const handleGetWebsite = async () => {
-//       try {
-//         const result = await axios.get(
-//           `${serverUrl}/api/website/get-by-id/${id}`,
-//           { withCredentials: true },
-//         );
-//         setWebsite(result.data);
-//         console.log(result.data);
-//       } catch (error) {
-//         console.log(error);
-//         setError(error.response.data.message);
-//       }
-//     };
-//     handleGetWebsite();
-//   }, [id]);
-//   if (error) {
-//     return (
-//       <div className="h-screen flex items-center justify-center bg-black text-red-400">
-//         {error}
-//       </div>
-//     );
-//   }
-//   if (!website) {
-//     return (
-//       <div className="h-screen fle items-center justify-center bg-black text-white">
-//         Loading...
-//       </div>
-//     );
-//   }
-//   return (
-//     <div className="h-screen w-screen flex bg-black text-white overflow-hidden">
-//       <aside>
-//         <Header />
-//         <Chat />
-//       </aside>
-//     </div>
-//   );
-//   const Header = () => {
-//     return (
-//       <div className="h-14 px-14 flex items-center justify-between border-b border-white/10">
-//         <span className="font-semibold truncate">{website.title}</span>
-//       </div>
-//     );
-//   };
-//   const Chat = () => {
-//     return (
-//       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-//         {website.conversation.map((m, i) => (
-//           <div
-//             key={i}
-//             className={`max-w-[85%] ${m.role === "user" ? "ml-auto" : "mr-auto"}`}
-//           >
-//             <div>{m.content}</div>
-//           </div>
-//         ))}
-//       </div>
-//     );
-//   };
-// };
-
-// export default Editor;
-
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { serverUrl } from "../App";
-import { Code, Code2, Monitor, Rocket, Send } from "lucide-react";
-import { AnimatePresence,motion } from "motion/react";
+import {
+  Code,
+  Code2,
+  MessageSquare,
+  Monitor,
+  Rocket,
+  Send,
+  X,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import Editor from "@monaco-editor/react";
 
 // ✅ Editor se BAHAR aur UPAR
-const Header = ({ website }) => {
+const Header = ({ website, onclose }) => {
   return (
     <div className="h-14 px-14 flex items-center justify-between border-b border-white/10">
       <span className="font-semibold truncate">{website?.title}</span>
+      {onclose && (
+        <button onClick={onclose}>
+          <X size={18} color="white" />
+        </button>
+      )}
     </div>
   );
 };
@@ -148,7 +89,7 @@ const Chat = ({
   );
 };
 
-const Editor = () => {
+const WebsiteEditor = () => {
   const { id } = useParams();
   const [website, setWebsite] = useState(null);
   const [error, setError] = useState("");
@@ -158,8 +99,9 @@ const Editor = () => {
   const [prompt, setPrompt] = useState("");
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const [updateLoading, setUpdateLoading] = useState(false);
-
-  const[showCode,setShowCode]=useState(false)
+  const [showFullPreview, setShowFullPreview] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   // const [sendLoading,setSendLoading]=useState()
   const thinkingSteps = [
     "Analyzing your request...",
@@ -176,7 +118,7 @@ const Editor = () => {
   };
 
   const handleUpdate = async () => {
-    if(!prompt)return
+    if (!prompt) return;
     setUpdateLoading(true);
     setMessages((m) => [...m, { role: "user", content: prompt }]);
     setPrompt(""); // ✅ prompt clear karo, messages nahi
@@ -280,11 +222,15 @@ const Editor = () => {
               <Rocket size={14} />
               Deploy
             </button>
-            <button className="p-2" onClick={()=>setShowCode(true)}>
+
+            <button className="p-2 lg:hidden" onClick={() => setShowChat(true)}>
+              <MessageSquare size={18} />
+            </button>
+            <button className="p-2" onClick={() => setShowCode(true)}>
               {" "}
               <Code2 size={18} />
             </button>
-            <button className="p-2">
+            <button onClick={() => setShowFullPreview(true)} className="p-2">
               <Monitor size={18} />
             </button>
           </div>
@@ -292,14 +238,59 @@ const Editor = () => {
         <iframe ref={iframeRef} className="flex-1 w-full bg-white" />
       </div>
       <AnimatePresence>
+        {showChat && (
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            className="fixed inset-0 z-[9999] bg-black flex flex-col"
+          >
+            <Header website={website} onclose={() => setShowChat(false)} />
+            <Chat
+              messages={messages}
+              prompt={prompt}
+              setPrompt={setPrompt}
+              handleUpdate={handleUpdate}
+              updateLoading={updateLoading}
+              thinkingSteps={thinkingSteps}
+              thinkingIndex={thinkingIndex}
+            />{" "}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {showCode && (
           <motion.div
-          
-          initial={{x:"100%"}}
-          animate={{x:0}}
-          exit={{x:"100%"}}
-          className="fixed inset-y-0 right-0 w-full lg:w-[45%] z-[9999] bg-[#1e1e1e] flex flex-col">
-
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            className="fixed inset-y-0 right-0 w-full lg:w-[45%] z-[9999] bg-[#1e1e1e] flex flex-col"
+          >
+            <div className="h-12 px-4 flex justify-between items-center border-b border-white/10 bg-[#1e1e1e]">
+              <span className="text-sm font-medium">index.html</span>
+              <button onClick={() => setShowCode(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <Editor
+              theme="vs-dark"
+              value={code}
+              language="html"
+              onChange={(v) => setCode(v)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showFullPreview && (
+          <motion.div className="fixed inset-0 z-[9999] bg-black">
+            <iframe className="w-full h-full bg-white " srcDoc={code} />
+            <button
+              onClick={() => setShowFullPreview(false)}
+              className="absolute top-4 mt-2 right-4 p-0  bg-black/50 rounded-lg"
+            >
+              <X />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -307,4 +298,4 @@ const Editor = () => {
   );
 };
 
-export default Editor;
+export default WebsiteEditor;
